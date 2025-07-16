@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom"
 import { useState } from "react"
 import { useUser } from "../context/UserContext"
 import { motion } from "framer-motion"
+import logo from "../assets/logo.png"
 
 export default function Header() {
   const [showInfo, setShowInfo] = useState(false)
@@ -18,11 +19,9 @@ export default function Header() {
   return (
     <header className="w-full bg-white/70 backdrop-blur-md px-6 py-2 shadow-sm flex justify-between items-center">
       <div className="flex items-center gap-2">
-        <img
-          src="/src/assets/logo-transparent.png"
-          alt="Lunaria Logo"
-          className="h-12 w-40 object-contain"
-        />
+        <Link to="/">
+          <img src={logo} alt="Lunaria Logo" className="h-10" />
+        </Link>
       </div>
 
       <button
