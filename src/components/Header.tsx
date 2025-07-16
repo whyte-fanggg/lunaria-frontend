@@ -1,8 +1,11 @@
 // src/components/Header.tsx
 import { Link, useNavigate } from "react-router-dom"
+import { useState } from "react"
 import { useUser } from "../context/UserContext"
+import { motion } from "framer-motion"
 
 export default function Header() {
+  const [showInfo, setShowInfo] = useState(false)
   const { name, setName } = useUser()
   const navigate = useNavigate()
 
@@ -20,8 +23,14 @@ export default function Header() {
           alt="Lunaria Logo"
           className="h-12 w-40 object-contain"
         />
-        
       </div>
+
+      <button
+        onClick={() => setShowInfo(true)}
+        className="text-xs px-3 py-1 rounded-full bg-pink-100 text-pink-800 hover:bg-pink-200 transition-all border border-pink-300 shadow-sm"
+      >
+        What is Lunaria?
+      </button>
 
       <nav className="space-x-4 flex items-center">
         <Link
@@ -45,6 +54,38 @@ export default function Header() {
           </button>
         )}
       </nav>
+      {showInfo && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-50"
+          onClick={() => setShowInfo(false)}
+        >
+          <motion.div
+            initial={{ y: 30, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 30, opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl border border-gray-200 text-gray-700"
+          >
+            <h2 className="text-lg font-semibold text-pink-700 mb-6">
+              🌸 Welcome to Lunaria
+            </h2>
+            <p className="text-sm leading-relaxed">
+              Lunaria is your soft emotional space — a pastel-themed mood and
+              music journal to capture how you feel every day.
+            </p>
+            <button
+              onClick={() => setShowInfo(false)}
+              className="mt-4 px-4 py-1 text-sm rounded-full bg-pink-100 text-pink-800 hover:bg-pink-200 transition-all border border-pink-300"
+            >
+              Close
+            </button>
+          </motion.div>
+        </motion.div>
+      )}
     </header>
   )
 }

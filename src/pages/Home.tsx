@@ -1,16 +1,35 @@
 import { useEffect, useState } from "react"
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts"
-import { useUser } from "../context/UserContext"
 import { motion } from "framer-motion"
-import Footer from "../components/Footer"
+import {
+  collection,
+  query,
+  orderBy,
+  onSnapshot,
+  Timestamp,
+} from "firebase/firestore"
+import { db } from "../firebase"
+import { useUser } from "../context/UserContext"
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts"
 
 type MoodLog = {
   _id: string
-  emotion: string
-  note?: string
+  emotion:
+    | "happy"
+    | "sad"
+    | "angry"
+    | "calm"
+    | "loved"
+    | "tired"
+    | "anxious"
+    | "excited"
+    | "confused"
+    | "grateful"
+    | "motivated"
+  note: string
   song?: string
-  author?: string
-  date: string
+  author: string
+  date?: Timestamp
+  createdAt: Timestamp
 }
 
 const moodColors: Record<string, string> = {
@@ -22,38 +41,51 @@ const moodColors: Record<string, string> = {
   tired: "bg-purple-200 text-purple-900",
   anxious: "bg-violet-200 text-violet-900",
   excited: "bg-orange-200 text-orange-900",
+  confused: "bg-gray-200 text-gray-900",
+  grateful: "bg-rose-200 text-rose-900",
+  motivated: "bg-lime-200 text-lime-900",
 }
 
 const moodHexColors: Record<string, string> = {
-  happy: "#facc15", // amber-400
-  sad: "#60a5fa", // blue-400
-  angry: "#f87171", // red-400
-  calm: "#34d399", // green-400
-  loved: "#f472b6", // pink-400
-  tired: "#a78bfa", // violet-400
-  anxious: "#c084fc", // purple-400
-  excited: "#fb923c", // orange-400
+  happy: "#facc15",
+  sad: "#60a5fa",
+  angry: "#f87171",
+  calm: "#34d399",
+  loved: "#f472b6",
+  tired: "#a78bfa",
+  anxious: "#c084fc",
+  excited: "#fb923c",
+  confused: "#94a3b8",
+  grateful: "#f9a8d4",
+  motivated: "#bef264",
 }
 
 export default function Home() {
   const { name } = useUser()
-  const [search, setSearch] = useState("")
-  const [onlyMine, setOnlyMine] = useState(false)
   const [logs, setLogs] = useState<MoodLog[]>([])
   const [loading, setLoading] = useState(true)
   const [activeFilter, setActiveFilter] = useState("all")
+  const [onlyMine, setOnlyMine] = useState(false)
+  const [search, setSearch] = useState("")
 
   useEffect(() => {
-    fetch("http://localhost:4000/mood")
-      .then((res) => res.json())
-      .then((data) => {
-        setLogs(data.reverse())
-        setLoading(false)
-      })
-      .catch((err) => {
-        console.error("Error fetching mood logs:", err)
-        setLoading(false)
-      })
+    const q = query(collection(db, "mood_logs"), orderBy("createdAt", "desc"))
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map((doc) => {
+        const data = doc.data()
+        return {
+          _id: doc.id,
+          ...data,
+          createdAt: data.createdAt?.toDate?.() ?? new Date(),
+        }
+      }) as MoodLog[]
+
+      setLogs(docs)
+      setLoading(false)
+    })
+
+    return () => unsubscribe()
   }, [])
 
   const filteredLogs = logs.filter((log) => {
@@ -64,10 +96,10 @@ export default function Home() {
     return matchesMood && matchesUser && matchesSearch
   })
 
-  const moodCounts = filteredLogs.reduce((acc, log) => {
+  const moodCounts = filteredLogs.reduce<Record<string, number>>((acc, log) => {
     acc[log.emotion] = (acc[log.emotion] || 0) + 1
     return acc
-  }, {} as Record<string, number>)
+  }, {})
 
   const moodChartData = Object.entries(moodCounts).map(([mood, count]) => ({
     name: mood,
@@ -75,10 +107,11 @@ export default function Home() {
   }))
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-100 to-amber-100 px-4 py-6 font-outfit text-gray-800">
+    <main className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-100 to-amber-100 px-4 pt-4 font-outfit text-gray-800">
       <h1 className="text-3xl font-semibold mb-6 text-center">Mood Timeline</h1>
 
-      <div className="flex flex-wrap gap-2 justify-center mb-6">
+      {/* Mood Filter */}
+      <div className="flex flex-wrap gap-2 justify-center mb-4">
         {["all", ...Object.keys(moodColors)].map((mood) => (
           <button
             key={mood}
@@ -94,17 +127,8 @@ export default function Home() {
         ))}
       </div>
 
+      {/* Show Only Mine Toggle */}
       <div className="flex justify-center mb-4">
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search notes..."
-          className="w-full max-w-xs px-4 py-2 text-sm rounded-full bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-300"
-        />
-      </div>
-
-      <div className="flex justify-center mb-6">
         <button
           onClick={() => setOnlyMine(!onlyMine)}
           className={`text-sm px-4 py-2 rounded-full border transition-all ${
@@ -117,8 +141,20 @@ export default function Home() {
         </button>
       </div>
 
+      {/* Search Input */}
+      <div className="flex justify-center mb-6">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search notes..."
+          className="w-full max-w-xs px-4 py-2 text-sm rounded-full bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-300"
+        />
+      </div>
+
+      {/* Mood Pie Chart */}
       {moodChartData.length > 0 && (
-        <div className="w-full max-w-sm mx-auto my-6">
+        <div className="w-full max-w-sm mx-auto mb-6">
           <h2 className="text-center text-sm font-medium text-gray-600 mb-2">
             Mood Frequency
           </h2>
@@ -133,7 +169,9 @@ export default function Home() {
                 outerRadius={65}
                 innerRadius={30}
                 labelLine={false}
-                label={({ percent }) => `${Math.round((percent || 0) * 100)}%`}
+                label={({ name, percent }) =>
+                  `${name} (${Math.round((percent || 0) * 100)}%)`
+                }
               >
                 {moodChartData.map((entry, index) => (
                   <Cell
@@ -148,6 +186,7 @@ export default function Home() {
         </div>
       )}
 
+      {/* Mood Cards */}
       {loading ? (
         <p className="text-center text-gray-500">Loading moods...</p>
       ) : filteredLogs.length === 0 ? (
@@ -173,11 +212,12 @@ export default function Home() {
                   {log.emotion}
                 </span>
                 <span className="text-xs text-gray-500">
-                  {new Date(log.date).toLocaleDateString(undefined, {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  })}
+                  {log.date &&
+                    log.date.toDate().toLocaleDateString(undefined, {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}
                 </span>
               </div>
 
@@ -188,6 +228,7 @@ export default function Home() {
                 </p>
               )}
 
+              {/* Note + Author */}
               {log.note && (
                 <div className="flex justify-between items-end gap-4">
                   <p className="text-sm text-gray-800">{log.note}</p>
@@ -202,7 +243,6 @@ export default function Home() {
           ))}
         </div>
       )}
-      <Footer />
     </main>
   )
 }

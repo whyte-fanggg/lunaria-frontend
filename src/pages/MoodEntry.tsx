@@ -1,4 +1,6 @@
 // src/pages/MoodEntry.tsx
+import { collection, addDoc, Timestamp } from "firebase/firestore"
+import { db } from "../firebase"
 import { useState } from "react"
 import { toast } from "react-hot-toast"
 import { motion } from "framer-motion"
@@ -9,10 +11,14 @@ const moods = [
   { emoji: "😊", label: "happy" },
   { emoji: "😢", label: "sad" },
   { emoji: "😠", label: "angry" },
+  { emoji: "😌", label: "calm" },
   { emoji: "😍", label: "loved" },
   { emoji: "😴", label: "tired" },
   { emoji: "😬", label: "anxious" },
   { emoji: "🤩", label: "excited" },
+  { emoji: "🤔", label: "confused" },
+  { emoji: "🙏", label: "grateful" },
+  { emoji: "💪", label: "motivated" },
 ]
 
 export default function MoodEntry() {
@@ -24,23 +30,22 @@ export default function MoodEntry() {
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async () => {
-    if (!selectedMood) return toast.error("Please select a mood.")
+    if (!selectedMood || !note.trim()) {
+      toast.error("Please select a mood and enter a note.")
+      return
+    }
 
     setLoading(true)
-    try {
-      const res = await fetch("http://localhost:4000/mood", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          emotion: selectedMood,
-          note,
-          song,
-          date,
-          author: name,
-        }),
-      })
 
-      if (!res.ok) throw new Error("Failed to save mood")
+    try {
+      await addDoc(collection(db, "mood_logs"), {
+        emotion: selectedMood,
+        note,
+        song,
+        date: new Date(date),
+        author: name,
+        createdAt: Timestamp.now(),
+      })
 
       toast.success("Mood logged!")
       setSelectedMood("")
@@ -49,10 +54,18 @@ export default function MoodEntry() {
       setDate(new Date().toISOString().split("T")[0])
     } catch (err) {
       console.error(err)
-      toast.error("Error saving mood")
+      toast.error("Failed to log mood.")
     } finally {
       setLoading(false)
     }
+  }
+
+  const [hoveredMood, setHoveredMood] = useState<string | null>(null)
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
+
+  function handleMouseMove(e: React.MouseEvent, label: string) {
+    setHoveredMood(label)
+    setTooltipPos({ x: e.clientX, y: e.clientY })
   }
 
   return (
@@ -68,10 +81,12 @@ export default function MoodEntry() {
       <div className="flex flex-wrap justify-center gap-3 mb-6">
         {moods.map((m) => (
           <motion.button
-            whileTap={{ scale: 1.1 }}
             key={m.label}
+            whileTap={{ scale: 1.1 }}
             onClick={() => setSelectedMood(m.label)}
-            className={`text-3xl p-3 rounded-full border-2 transition-all ${
+            onMouseMove={(e) => handleMouseMove(e, m.label)}
+            onMouseLeave={() => setHoveredMood(null)}
+            className={`text-3xl p-3 rounded-full border-2 transition-all duration-300 ${
               selectedMood === m.label
                 ? "bg-pink-100 border-pink-400"
                 : "border-gray-300 hover:bg-gray-100"
@@ -81,6 +96,22 @@ export default function MoodEntry() {
           </motion.button>
         ))}
       </div>
+
+      {hoveredMood && (
+        <motion.div
+          className="fixed px-3 py-1 text-xs rounded-xl shadow-lg bg-white text-gray-800 border border-gray-300 pointer-events-none z-50"
+          style={{
+            top: tooltipPos.y + 15,
+            left: tooltipPos.x + 15,
+          }}
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          transition={{ duration: 0.15 }}
+        >
+          {hoveredMood.charAt(0).toUpperCase() + hoveredMood.slice(1)}
+        </motion.div>
+      )}
 
       <div className="w-full max-w-md space-y-4">
         {/* Note */}
